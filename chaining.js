@@ -71,7 +71,7 @@ function chaining(selects, options, data, buildTree) {
         ///<summary>Checks a checkbox, but does not refresh the multiselect widget.  
         ///   User this when checking multiple options at once and you want to 
         ///   defer calling refresh until all are checked.</summary>
-        ///<returns type="boolean">True if the select element is chained, false otherwise.</returns>
+        ///<returns type="boolean">The number of child options added for the checked node.</returns>
 
         var clickedNode = lookUpNode(htmlIdToNodeId(optionId));
         clickedNode.data.checked = true;
@@ -80,7 +80,7 @@ function chaining(selects, options, data, buildTree) {
             .attr('selected', true)
             .removeClass('ui-helper-hidden');
 
-        addOptgroup(clickedNode);
+        return addOptgroup(clickedNode);
     }
 
     
@@ -98,6 +98,15 @@ function chaining(selects, options, data, buildTree) {
         obj.multiselect(descendants > 14 ? { 'height': 400 } : { 'height': 'auto' })
            .multiselect(descendants > 0 ? 'enable' : 'disable')
            .multiselect('refresh');
+    }
+
+
+    function refreshAll() {
+        ///<summary>calls refresh on all select multiselect elements
+
+        for (var i = 0; i < _selects.length; i++) {
+            refresh(_selects[i]);
+        }
     }
 
 
@@ -315,5 +324,6 @@ function chaining(selects, options, data, buildTree) {
     self.initialize = initialize;
     self.isChained = isChained;
     self.check = check;
+    self.refreshAll = refreshAll;
     
 }
