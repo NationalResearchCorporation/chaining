@@ -18,23 +18,26 @@
     
 */
 
-
-function chaining(selects, options, data, buildTree) {
-    ///<summary>This class is used to initialize chaining. </summary>
-    ///<param name="selects" type="array">A sorted array containing ids of each select element in the chain</param>
+function chaining(divToChain, multiselectOptions, data, buildTree) {
+    ///<summary>This class is used to initialize chaining.</summary>
+    ///<param name="divToChain" type="array">A jQuery object containing each select element in the chain</param>
     ///<param name="options" type="object">The multiselect options object that is used for each select element</param>
     ///<param name="data" type="object">The data used to build the tree.  This is passed as an input parameter to the buildTree callback</param>
     ///<param name="buildTree" type="callback">Callback used to construct an arboreal tree.  Takes 'data' as input, and returns an arboreal tree where each node contains the following data points: value (the option value), label (the option text), extendedLabel (long text i.e.: "grandparent / parent / me"), checked (set to false).</param>
     ///<returns type="object">An instance of the 'chaining' class</returns>
 
-    // private members
+    // Private members
     var _tree;
-    var _selects = selects;
-    var _options = options;
+    var _divToChain = divToChain;
+    var _selects = [];
+    var _options = multiselectOptions;
     var _data = data;
     var _buildTree = buildTree;
-
-
+    
+    // Get the id for each select element and store in array
+    _divToChain.find('select').each(function () {
+        _selects.push(this.id);
+    });
 
     /*  PUBLIC METHODS
     -------------------------------------------*/
@@ -85,11 +88,11 @@ function chaining(selects, options, data, buildTree) {
 
     
     function refresh(selectSelector) {
-        ///<summary>perform the following actions on an select element
-        /// 1) hide empty opt groups
-        /// 2) enable scrolling if more than 14 rows (count optgroups and options) exist in the select
-        /// 3) disable if 0 rows exist in the select
-        /// 4) call refresh method in multiselect plugin</summary>
+        ///<summary>Perform the following actions on an select element
+        /// 1) Hide empty opt groups
+        /// 2) Enable scrolling if more than 14 rows (count optgroups and options) exist in the select
+        /// 3) Disable if 0 rows exist in the select
+        /// 4) Call refresh method in multiselect plugin</summary>
 
         var obj = jQuery('#' + selectSelector);
         obj.find('optgroup:not(:has(:not(.ui-helper-hidden)))').addClass('ui-helper-hidden');
@@ -102,7 +105,7 @@ function chaining(selects, options, data, buildTree) {
 
 
     function refreshAll() {
-        ///<summary>calls refresh on all select multiselect elements
+        ///<summary>Calls refresh on all select multiselect elements
 
         for (var i = 0; i < _selects.length; i++) {
             refresh(_selects[i]);
@@ -113,7 +116,7 @@ function chaining(selects, options, data, buildTree) {
     /*  PRIVATE METHODS - DOM MANIPULATION
     -------------------------------------------*/
 
-    // create all options
+    // Create all options
     function createOptions(node) {
         node.traverseDown(function iterator(descendant) {
             if (node.id == descendant.id) {
@@ -125,17 +128,19 @@ function chaining(selects, options, data, buildTree) {
         });
     }
     
-    // add (or show) an optgroup for this node in the select element one level below it
+    // Add (or show) an optgroup for this node in the select element one level below it
     function addOptgroup(checkedNode, create) {
 
         var nodesAdded = 0;
 
         if (checkedNode.depth < _selects.length && checkedNode.children.length > 0) {
+            // Generate a unique parent id based on the first childs id
+            optGroupId = parentIdFromHtmlId(nodeIdToHtmlId(checkedNode.children[0].id));
             if (create) {
                 jQuery('#' + _selects[checkedNode.depth])
-                    .append('<optgroup class="ui-helper-hidden" label="' + checkedNode.data.extendedLabel + '"></optgroup>');
+                    .append('<optgroup class="ui-helper-hidden" id="' + optGroupId + '" label="' + checkedNode.data.extendedLabel + '"></optgroup>');
             } else {
-                jQuery('#' + _selects[checkedNode.depth] + ' optgroup[label="' + checkedNode.data.extendedLabel + '"]')
+                jQuery('#' + optGroupId)
                     .removeClass('ui-helper-hidden');
             }
             nodesAdded = addOptions(checkedNode, create);
@@ -145,27 +150,28 @@ function chaining(selects, options, data, buildTree) {
 
     }
     
-    // add (or show) option elements to an otpgroup 
+    // Add (or show) option elements to an otpgroup 
     function addOptions(node, create) {
 
         var optionsAdded; 
         var selectSelector = _selects[node.depth];
-        var optgroupSelector = node.parent ? ' optgroup[label="' + node.data.extendedLabel + '"]' : '';
 
         for (optionsAdded = 0; optionsAdded < node.children.length; optionsAdded++) {
             var child = node.children[optionsAdded];
+            var childId = nodeIdToHtmlId(child.id);
+            var optGroupSelector = node.parent ? ' #' + parentIdFromHtmlId(childId) : '';
             if (create) {
-                jQuery('#' + selectSelector + optgroupSelector)
-                    .append('<option class="ui-helper-hidden" id=' + nodeIdToHtmlId(child.id) + ' value=' + child.data.value + '>' + child.data.label + '</option>');
+                jQuery('#' + selectSelector + optGroupSelector)
+                    .append('<option class="ui-helper-hidden" id=' + childId + ' value=' + child.data.value + '>' + child.data.label + '</option>');
             } else {
-                jQuery('#' + nodeIdToHtmlId(child.id)).removeClass('ui-helper-hidden');
+                jQuery('#' + childId).removeClass('ui-helper-hidden');
             }
         }
 
         return optionsAdded;
     }
 
-    // hide all option elements that are descendants of this node
+    // Hide all option elements that are descendants of this node
     function hideOptions(node) {
         node.traverseDown(function iterator(descendant) {
             if (node.id != descendant.id) {
@@ -178,14 +184,10 @@ function chaining(selects, options, data, buildTree) {
         });
     }
             
-    
-
-
-
     /*  PRIVATE METHODS - EVENT HANDLERS
     -------------------------------------------*/
     
-    // handle click event
+    // Handle click event
     function click(event, ui) {
 
         var selectId = event.target.id;
@@ -197,18 +199,18 @@ function chaining(selects, options, data, buildTree) {
             if (addOptgroup(clickedNode) > 0) {
                 refresh(_selects[clickedNode.depth]);
             }
-        }
-        else {
+        } else {
             clickedNode.data.checked = false;
             hideOptions(clickedNode);
             for (var i = clickedNode.depth; i < _selects.length; i++) {
                 refresh(_selects[i]);
             }
-
         }
+
+        _divToChain.trigger('stateChanged', [countCheckedNodes()])
     }
 
-    // handle checkall event
+    // Handle checkall event
     function checkall(event) {
 
         var nodesAdded = 0, depth;
@@ -228,9 +230,10 @@ function chaining(selects, options, data, buildTree) {
             refresh(_selects[depth]);
         }
 
+        _divToChain.trigger('stateChanged', [countCheckedNodes()])
     }
 
-    // handle uncheckall event
+    // Handle uncheckall event
     function uncheckall(event) {
 
         var depth;
@@ -249,9 +252,11 @@ function chaining(selects, options, data, buildTree) {
         for (var i = depth; i < _selects.length; i++) {
             refresh(_selects[i]);
         }
+
+        _divToChain.trigger('stateChanged', [countCheckedNodes()])
     }
 
-    // handle optgrouptoggle (optgroup click) event
+    // Handle optgrouptoggle (optgroup click) event
     function optgrouptoggle(event, ui) {
 
         var nodesAdded = 0, depth;
@@ -284,6 +289,8 @@ function chaining(selects, options, data, buildTree) {
                 refresh(_selects[i]);
             }
         }
+
+        _divToChain.trigger('stateChanged', [countCheckedNodes()])
     }
 
 
@@ -291,7 +298,7 @@ function chaining(selects, options, data, buildTree) {
     /*  PRIVATE METHODS - HELPERS
     -------------------------------------------*/
 
-    // fast lookup for a tree node by it's id
+    // Fast lookup for a tree node by it's id
     function lookUpNode(nodeId) {
 
         var ids = nodeId.split('/');
@@ -302,12 +309,12 @@ function chaining(selects, options, data, buildTree) {
         return node;
     }
 
-    // convert a tree-node ID to an html compatible id
+    // Convert a tree-node ID to an html compatible id
     function nodeIdToHtmlId(nodeId) {
         return 't-' + nodeId.replace(/\//g, '-');
     }
 
-    // convert an html id back to a tree-node id
+    // Convert an html id back to a tree-node id
     function htmlIdToNodeId(htmlId) {
         return htmlId
             .replace(/ui-multiselect-/, '')
@@ -315,7 +322,23 @@ function chaining(selects, options, data, buildTree) {
             .replace(/-/g, '/');
     }
 
+    // Create a parent html id based on a child id
+    // ex: t-0-1-0-4 becomes t-0-1-0-parent
+    function parentIdFromHtmlId(htmlId) {
+        return htmlId.replace(/-[0-9]*$/, '-parent')
+    }
 
+    // Count the number of nodes currently selected
+    function countCheckedNodes() {
+        var cnt = 0;
+        _tree.traverseDown(function iterator(descendant) {
+            if (descendant.data.checked === true) {
+                cnt++;
+            }
+        });
+
+        return cnt;
+    }
 
     /*  ENCAPSULATION
     -------------------------------------------*/
@@ -324,6 +347,34 @@ function chaining(selects, options, data, buildTree) {
     self.initialize = initialize;
     self.isChained = isChained;
     self.check = check;
+    self.refresh = refresh;
     self.refreshAll = refreshAll;
     
 }
+
+///<summary>Expose chaining as a jQuery plugin. </summary>
+///<param name="mehtod" type="array">The name of the chaining method to call</param>
+///<param name="options" type="object">The multiselect options object that is used for each select element</param>
+///<returns type="object">the jQuery object or method result</returns>
+jQuery.fn.chain = function (method, options) {
+    
+    if (method === "initialize") {
+        this._chain = new chaining(this, options.multiselectOptions, options.data, options.buildTree);
+        this._chain.initialize();
+    }
+    else if (method === "isChained") {
+        return this._chain.isChained(options.selectId);
+    }
+    else if (method === "check") {
+        return this._chain.check(options.optionId);
+    }
+    else if (method === "refresh") {
+        this._chain.refresh(options.selectSelector);
+    }
+    else if (method === "refreshAll") {
+        this._chain.refreshAll();
+    }
+
+    return this;
+}
+
